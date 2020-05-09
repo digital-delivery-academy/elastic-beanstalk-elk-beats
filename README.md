@@ -123,17 +123,8 @@ There are some scripts in the `scripts` directory that should make things simple
 
 - clone this repo
 - `chmod` the scripts directory
-- from the root of the checked out repos directory, run `./scripts/customise-config-files.sh`
 - from the root of the checked out repos directory, run `./scripts/package-in-ebextensions.sh`
 - move the produced `.ebextensions` directory to the root of the directory that will be zipped up to be shipped to Elastic Beanstalk.
-
-### `customise-config-files.sh`
-
-You need to provide some arguments to this script like this:
-
-`./scripts/customise-config-files.sh my-elk-host.com elk-ui-username elk-ui-password application-name environment-name`
-
-If you're using a CI system, you probably want to let that take care of managing the secrets and inject them accordingly.
 
 ### `package-in-ebextensions.sh`
 
