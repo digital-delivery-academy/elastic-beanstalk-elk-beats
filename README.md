@@ -1,6 +1,8 @@
 # elastic-beanstalk-elk-beats
 Elastic Beanstalk configuration for shipping logs, metrics and audit details using ELK Beats to the ELK stack (ElasticSearch, Logstash and Kibana).
 
+This little guide and the contained configuration should plug nicely into your existing build pipeline, and give you an out of the box monitoring system with some sexy dashboards.
+
 This repoository contains:
 
 - initial configurations for Filebeat
@@ -8,6 +10,10 @@ This repoository contains:
 - initial configuriations for Auditbeat
 - a small script for customisation
 - a little guide on getting up and running
+
+The base configurations here are for Elastic Beanstalk deployments that are for applications in a `docker` container with `nginx` on the `eb` instance.
+
+If you have any custom `nginx` configurations that you're already using, then you need to merge them with the configurtion here.
 
 ## Deploying ELK stack to AWS EC2
 
@@ -69,6 +75,46 @@ We need the credentials for the Kibana user interface now so we can see our logs
 Right click on the EC2 instance, click `Instance Settings` and then `Get System log`.  Scroll through the logs and you'll see the username and password for the UI there.
 
 Load up a browser and point it to your instance: `http://<public ip or dns address>:5601` and enter your credentials.  Kibana should load up!
+
+## Overview of the ebextensions we're making
+
+We have four thing for `ebextensions` to take care of here:
+
+- deploying a new custom `nginx` configuration
+- deploy and configure `filebeat`
+- deploy and configure `metricbeat`
+- deploy and configure `auditbeat`
+
+### `nginx` configuration
+
+There's nothing magic here really.  We're adding an endpoint to allow us to monitor `nginx` in `/server-status` with a simple `location` addition:
+
+```
+location /server-status {
+    stub_status on;
+    access_log off;
+    allow 127.0.0.1;
+    deny all;
+}
+```
+
+And we're making some changes to the log format.  We're replacing `remote_ip` with `http_x_forwarded_for` to make sure that we're tracking the IP address of the requester as it hits the Elasic Load Balancer.  We do this because we want to see the geographic positions that consumers are hittin the serivces from.  If we don't do this bit, then we'll only ever get the internal AWS IP from the load balancer (I burnt 4 hours wondering why `geopip` wasn't working for the Kibana dashboards that we're going to get to later, and this was, quite obviously the reason; can't get geographic information from an internal IP address, duh.)
+
+### `filebeat`
+
+Filebeat is the thing we use to prospect for log files and ship them off to ELK.  We have a configuration here that takes all of the log files that you'd get if you requested the logs in the Elastic Beanstalk console screen.  Additionally, we use two `filebeat` modules that are preconfigured for us (and do a lot of heavy lifting behind the scenes) to gather and analyse `system` and `nginx` logs.  This is especially helpful as they work super nicely with the built in dashboards in Kibana that we're gonna set up next.
+
+If you want to enable additional `filebeat` modules that are pacakged with `filebeat`, then just edit the `filebeat.config` file at the bottom under the `commands` section and simply include their names.
+
+We have two custom fields that we ship with each entry.  That is  `environment` and `application`.  We use that to allow us to filter by environment and application.  I've picked confusing names here if we're in the `eb` space, but `environment` in this context maps to `test`, `live`, `prod` etc (the type of enviornment) and `application` maps to the name of the application e.g. `my-microservice`.  This would then allow us in Kibana to see logs from `my-microservice` across `test` and `prod`, or just `test` or just `prod` etc.  This is useful for using the same ELK instance to manage all of our logs.
+
+### `metricbeat`
+
+Metricbeat is the thing we use to pull metrics about uptime, memory, disk, CPU, network etc etc etc from the instance and from running `docker` containers.  We have the same additional fields for `environment` and `application` as we do for `filebeat`.  Metricbeat gives us some great dashboards and timeseries mapping of utilisation over time.  We also collect the service status that we configured in the `nginx` configuration with Metricbeat.
+
+### `auditbeat`
+
+Auditbeat is the thing that we use to monitor `auditd` and watch some basic operations that we probably want to track over time (like who and when people are reading the `/etc/passwd` file or `ssh` access etc).  We add `environment` and `application` fields to everything we ship as well so we can drill down per service and per environment.  The Auditbeat monitoring gives us some basic dashboards and collated, centralised information that we could, if we had too, start a basic security investigation.  We definitely wouldn't be any worse off if we had the information this thing collects in the event of a breach etc, and collecting it allows us to work to setup alerts when some of the things it watches for happen.
 
 
 
