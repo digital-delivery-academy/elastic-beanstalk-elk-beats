@@ -8,7 +8,7 @@ This repoository contains:
 - initial configurations for Filebeat
 - initial configurations for Metricbeat
 - initial configuriations for Auditbeat
-- a small script for customisation
+- a small script for customisation in a build pipeline
 - a little guide on getting up and running
 
 The base configurations here are for Elastic Beanstalk deployments that are for applications in a `docker` container with `nginx` on the `eb` instance.
@@ -117,4 +117,24 @@ Metricbeat is the thing we use to pull metrics about uptime, memory, disk, CPU, 
 Auditbeat is the thing that we use to monitor `auditd` and watch some basic operations that we probably want to track over time (like who and when people are reading the `/etc/passwd` file or `ssh` access etc).  We add `environment` and `application` fields to everything we ship as well so we can drill down per service and per environment.  The Auditbeat monitoring gives us some basic dashboards and collated, centralised information that we could, if we had too, start a basic security investigation.  We definitely wouldn't be any worse off if we had the information this thing collects in the event of a breach etc, and collecting it allows us to work to setup alerts when some of the things it watches for happen.
 
 
+## Updating the pacakging of your applciations via your pipeline/CI system
 
+There are some scripts in the `scripts` directory that should make things simple for you to use this repo in your build system.  If you're just using the configurations as they are, then you can follow this flow, othewise, feel free to do what you need to do.  So, in your pipeline add a step before packaging to do something like this:
+
+- clone this repo
+- `chmod` the scripts directory
+- from the root of the checked out repos directory, run `./scripts/customise-config-files.sh`
+- from the root of the checked out repos directory, run `./scripts/package-in-ebextensions.sh`
+- move the produced `.ebextensions` directory to the root of the directory that will be zipped up to be shipped to Elastic Beanstalk.
+
+### `customise-config-files.sh`
+
+You need to provide some arguments to this script like this:
+
+`./scripts/customise-config-files.sh my-elk-host.com elk-ui-username elk-ui-password application-name environment-name`
+
+If you're using a CI system, you probably want to let that take care of managing the secrets and inject them accordingly.
+
+### `package-in-ebextensions.sh`
+
+All this does is create an `.ebextensions` folder with the contents in it.  Ship this to the root of your deployable directory that will be zipped up for Elastic Beanstalk.
